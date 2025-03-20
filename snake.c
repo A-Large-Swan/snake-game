@@ -1,180 +1,170 @@
-#include <ncurses.h>
+#include "snake.h"
+#include "game.h"
+#include "level.h"
+#include "ui.h"
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <string.h>
+#include <wchar.h>
 
-#define WIDTH 40
-#define HEIGHT 20
-#define SNAKE_LENGTH 5
-#define DELAY 50000
+extern Point food;
+extern Level levels[3];
+extern Point obstacles[MAX_OBSTACLES];
+extern int num_obstacles;
+extern int score;
+extern int game_over;
+extern int current_level;
+extern int game_mode;
 
-typedef struct Point {
-    int x;
-    int y;
-} Point;
+// 全局蛇变量
+static Snake snake;
 
-typedef struct Snake {
-    Point body[WIDTH * HEIGHT];
-    int length;
-    int direction;  // 0: up, 1: right, 2: down, 3: left
-} Snake;
+// 获取蛇的状态
+Snake* get_snake(void) {
+    return &snake;
+}
 
-Point food;
-Snake snake;
-int score = 0;
-int game_over = 0;
-
-void setup() {
-    // 初始化ncurses
-    initscr();
-    noecho();
-    curs_set(0);
-    keypad(stdscr, TRUE);
-    timeout(100);
-    
-    // 初始化随机数生成器
-    srand(time(NULL));
-    
-    // 初始化蛇
+// 初始化蛇
+void init_snake(void) {
     snake.length = SNAKE_LENGTH;
-    snake.direction = 1;
+    snake.direction = 1; // 初始向右移动
+    
+    // 设置蛇的初始位置在屏幕中间
+    int start_x = WIDTH / 4;
+    int start_y = HEIGHT / 2;
+    
     for (int i = 0; i < snake.length; i++) {
-        snake.body[i].x = WIDTH/4 - i;
-        snake.body[i].y = HEIGHT/2;
+        snake.body[i].x = start_x - i;
+        snake.body[i].y = start_y;
     }
-    
-    // 生成第一个食物
-    food.x = rand() % (WIDTH - 2) + 1;
-    food.y = rand() % (HEIGHT - 2) + 1;
 }
 
-void draw() {
-    // 使用erase()代替clear()，减少闪烁
-    erase();
+// 更新蛇的位置
+void update_snake(int ch) {
+    // 根据输入更新方向
+    if (ch == KEY_UP && snake.direction != 2) snake.direction = 0;
+    else if (ch == KEY_RIGHT && snake.direction != 3) snake.direction = 1;
+    else if (ch == KEY_DOWN && snake.direction != 0) snake.direction = 2;
+    else if (ch == KEY_LEFT && snake.direction != 1) snake.direction = 3;
     
-    // 绘制边界
-    attron(A_BOLD);  // 使边界更明显
-    for (int i = 0; i < WIDTH; i++) {
-        mvprintw(0, i, "#");
-        mvprintw(HEIGHT-1, i, "#");
+    // 保存蛇头的当前位置
+    int head_x = snake.body[0].x;
+    int head_y = snake.body[0].y;
+    
+    // 根据方向移动蛇头
+    switch (snake.direction) {
+        case 0: head_y--; break; // 上
+        case 1: head_x++; break; // 右
+        case 2: head_y++; break; // 下
+        case 3: head_x--; break; // 左
     }
-    for (int i = 0; i < HEIGHT; i++) {
-        mvprintw(i, 0, "#");
-        mvprintw(i, WIDTH-1, "#");
-    }
-    attroff(A_BOLD);
     
-    // 绘制蛇
-    for (int i = 0; i < snake.length; i++) {
-        mvprintw(snake.body[i].y, snake.body[i].x, "O");
+    // 移动蛇身
+    for (int i = snake.length - 1; i > 0; i--) {
+        snake.body[i] = snake.body[i-1];
     }
     
-    // 绘制食物
-    mvprintw(food.y, food.x, "*");
-    
-    // 显示分数
-    mvprintw(HEIGHT + 1, 0, "Score: %d", score);
-    
-    refresh();
+    // 更新蛇头位置
+    snake.body[0].x = head_x;
+    snake.body[0].y = head_y;
 }
 
-void generate_food() {
-    food.x = rand() % (WIDTH - 2) + 1;
-    food.y = rand() % (HEIGHT - 2) + 1;
-}
-
-int check_collision() {
-    // 检查是否撞到墙
-    if (snake.body[0].x == 0 || snake.body[0].x == WIDTH-1 ||
-        snake.body[0].y == 0 || snake.body[0].y == HEIGHT-1)
+// 检查蛇是否碰撞到自己或边界
+int check_snake_collision(void) {
+    // 检查是否撞到边界
+    if (snake.body[0].x <= 0 || snake.body[0].x >= WIDTH-1 ||
+        snake.body[0].y <= 0 || snake.body[0].y >= HEIGHT-1) {
         return 1;
+    }
     
     // 检查是否撞到自己
     for (int i = 1; i < snake.length; i++) {
         if (snake.body[0].x == snake.body[i].x &&
-            snake.body[0].y == snake.body[i].y)
+            snake.body[0].y == snake.body[i].y) {
             return 1;
+        }
     }
     
     return 0;
 }
 
-void update() {
-    int ch = getch();
-    
-    // 更新方向
-    switch(ch) {
-        case KEY_UP:
-            if (snake.direction != 2) snake.direction = 0;
-            break;
-        case KEY_RIGHT:
-            if (snake.direction != 3) snake.direction = 1;
-            break;
-        case KEY_DOWN:
-            if (snake.direction != 0) snake.direction = 2;
-            break;
-        case KEY_LEFT:
-            if (snake.direction != 1) snake.direction = 3;
-            break;
-        case 'q':
-            game_over = 1;
-            break;
+// 检查某个位置是否是蛇的身体
+int is_snake_position(int x, int y) {
+    for (int i = 0; i < snake.length; i++) {
+        if (snake.body[i].x == x && snake.body[i].y == y) {
+            return 1;
+        }
     }
-    
-    // 保存蛇头的旧位置
-    Point old_head = snake.body[0];
-    
-    // 移动蛇身
-    for (int i = snake.length-1; i > 0; i--) {
-        snake.body[i] = snake.body[i-1];
-    }
-    
-    // 根据方向移动蛇头
-    snake.body[0] = old_head;
-    switch(snake.direction) {
-        case 0: // up
-            snake.body[0].y--;
-            break;
-        case 1: // right
-            snake.body[0].x++;
-            break;
-        case 2: // down
-            snake.body[0].y++;
-            break;
-        case 3: // left
-            snake.body[0].x--;
-            break;
-    }
-    
-    // 检查是否吃到食物
-    if (snake.body[0].x == food.x && snake.body[0].y == food.y) {
-        score += 10;
-        snake.length++;
-        generate_food();
-    }
-    
-    // 检查碰撞
-    if (check_collision()) {
-        game_over = 1;
-    }
+    return 0;
 }
 
-int main() {
-    setup();
-    
-    while (!game_over) {
-        draw();
-        update();
-        usleep(DELAY);
-    }
-    
-    // 游戏结束
+// 显示模式选择界面
+int show_mode_selection() {
     clear();
-    mvprintw(HEIGHT/2, WIDTH/2 - 5, "Game Over!");
-    mvprintw(HEIGHT/2 + 1, WIDTH/2 - 7, "Final Score: %d", score);
-    refresh();
-    sleep(2);
+    int choice = 0;
+    int key;
     
-    endwin();
-    return 0;
+    while (1) {
+        clear();
+        mvaddwstr(HEIGHT/2 - 5, WIDTH/2 - 10, L"贪吃蛇游戏 - 模式选择");
+        
+        if (choice == 0) attron(A_REVERSE);
+        mvaddwstr(HEIGHT/2 - 2, WIDTH/2 - 5, L"经典模式");
+        if (choice == 0) attroff(A_REVERSE);
+        
+        if (choice == 1) attron(A_REVERSE);
+        mvaddwstr(HEIGHT/2, WIDTH/2 - 5, L"闯关模式");
+        if (choice == 1) attroff(A_REVERSE);
+        
+        mvaddwstr(HEIGHT/2 + 3, WIDTH/2 - 15, L"使用上下键选择，回车确认");
+        
+        refresh();
+        key = getch();
+        
+        if (key == KEY_UP) {
+            choice = 0;
+        } else if (key == KEY_DOWN) {
+            choice = 1;
+        } else if (key == 10) { // 回车键
+            return choice;
+        }
+    }
+}
+
+// 显示关卡完成界面
+int show_level_complete() {
+    clear();
+    int choice = 0;
+    int key;
+    wchar_t buf[100];
+    
+    while (1) {
+        clear();
+        swprintf(buf, sizeof(buf)/sizeof(wchar_t), L"恭喜！关卡 %d 完成！", current_level + 1);
+        mvaddwstr(HEIGHT/2 - 5, WIDTH/2 - 10, buf);
+        swprintf(buf, sizeof(buf)/sizeof(wchar_t), L"得分: %d", score);
+        mvaddwstr(HEIGHT/2 - 3, WIDTH/2 - 10, buf);
+        
+        if (choice == 0) attron(A_REVERSE);
+        mvaddwstr(HEIGHT/2, WIDTH/2 - 5, L"下一关");
+        if (choice == 0) attroff(A_REVERSE);
+        
+        if (choice == 1) attron(A_REVERSE);
+        mvaddwstr(HEIGHT/2 + 2, WIDTH/2 - 5, L"退出游戏");
+        if (choice == 1) attroff(A_REVERSE);
+        
+        mvaddwstr(HEIGHT/2 + 5, WIDTH/2 - 15, L"使用上下键选择，回车确认");
+        
+        refresh();
+        key = getch();
+        
+        if (key == KEY_UP) {
+            choice = 0;
+        } else if (key == KEY_DOWN) {
+            choice = 1;
+        } else if (key == 10) { // 回车键
+            return choice;
+        }
+    }
 }

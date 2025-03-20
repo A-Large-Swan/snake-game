@@ -1,14 +1,35 @@
+
 CC = gcc
-CFLAGS = -Wall -Wextra
-LDFLAGS = -lncurses
+CFLAGS = -Wall -Wextra -MMD -MP
+LDFLAGS = -lncursesw
 
 TARGET = snake
-SRC = snake.c
+SRC = snake.c game.c level.c ui.c main.c
+OBJ = $(SRC:.c=.o)
+DEP = $(SRC:.c=.d)
 
-all: $(TARGET)
+# Debug build flags
+DEBUGFLAGS = -g -DDEBUG
+# Release build flags
+RELEASEFLAGS = -O2 -DNDEBUG
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LDFLAGS)
+.PHONY: all clean debug release
+
+all: release
+
+debug: CFLAGS += $(DEBUGFLAGS)
+debug: $(TARGET)
+
+release: CFLAGS += $(RELEASEFLAGS)
+release: $(TARGET)
+
+$(TARGET): $(OBJ)
+	$(CC) $(OBJ) -o $@ $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(OBJ) $(DEP)
+
+-include $(DEP)
