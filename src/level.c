@@ -1,4 +1,4 @@
-#include "level.h"
+#include "../include/level.h"
 #include <string.h>
 
 extern Level levels[3];

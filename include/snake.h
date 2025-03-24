@@ -6,7 +6,7 @@
 #define WIDTH 40
 #define HEIGHT 20
 #define SNAKE_LENGTH 5
-#define DELAY 50000
+#define DELAY 30000
 
 typedef struct Point {
     int x;

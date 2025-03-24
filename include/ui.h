@@ -10,6 +10,8 @@ void init_ui(void);
 void draw(void);
 void draw_border(void);
 void draw_snake(void);
+void draw_snake_body(void);
+void draw_snake_head(void);
 void draw_food(void);
 void draw_obstacles(void);
 void draw_score(void);

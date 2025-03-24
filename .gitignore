@@ -1,0 +1,15 @@
+# 编译输出
+snake
+*.o
+*.d
+build/
+
+# IDE和编辑器临时文件
+.vscode/
+.idea/
+*.swp
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db

@@ -1,12 +1,13 @@
-
 CC = gcc
-CFLAGS = -Wall -Wextra -MMD -MP
+CFLAGS = -Wall -Wextra -MMD -MP -Iinclude
 LDFLAGS = -lncursesw
 
 TARGET = snake
-SRC = snake.c game.c level.c ui.c main.c
-OBJ = $(SRC:.c=.o)
-DEP = $(SRC:.c=.d)
+SRC_DIR = src
+BUILD_DIR = build
+SRC = $(wildcard $(SRC_DIR)/*.c)
+OBJ = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRC))
+DEP = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.d,$(SRC))
 
 # Debug build flags
 DEBUGFLAGS = -g -DDEBUG
@@ -26,8 +27,11 @@ release: $(TARGET)
 $(TARGET): $(OBJ)
 	$(CC) $(OBJ) -o $@ $(LDFLAGS)
 
-%.o: %.c
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
 clean:
 	rm -f $(TARGET) $(OBJ) $(DEP)

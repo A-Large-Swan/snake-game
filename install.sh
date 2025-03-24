@@ -1,40 +1,45 @@
 #!/bin/bash
 
-# 检查操作系统类型
-if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-    echo "检测到Windows系统，请确保已安装MSYS2或Cygwin"
-    echo "请手动安装以下依赖："
-    echo "1. gcc"
-    echo "2. make"
-    echo "3. ncurses-devel (MSYS2) 或 libncurses-devel (Cygwin)"
-    exit 0
+# 检测操作系统类型
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS_TYPE=$ID
+    OS_FAMILY=$ID_LIKE
+elif [ -f /etc/debian_version ]; then
+    OS_TYPE="debian"
+    OS_FAMILY="debian"
+elif [ -f /etc/redhat-release ]; then
+    OS_TYPE="rhel"
+    OS_FAMILY="rhel"
+else
+    echo "无法确定系统类型，请手动安装依赖。"
+    exit 1
 fi
 
-# Linux系统安装依赖
-if [ "$(id -u)" != "0" ]; then
-   echo "在Linux系统上需要root权限安装依赖" 1>&2
-   exit 1
-fi
-
-# 检测Linux发行版类型
-if [ -f /etc/debian_version ]; then
-    # Debian/Ubuntu系统
+# 安装依赖
+echo "正在安装依赖..."
+if [[ $OS_TYPE == "debian" || $OS_TYPE == "ubuntu" || $OS_FAMILY == *"debian"* ]]; then
     apt-get update
     apt-get install -y gcc make libncursesw5-dev
-elif [ -f /etc/redhat-release ]; then
-    # RHEL/CentOS系统
-    yum update
+elif [[ $OS_TYPE == "fedora" || $OS_TYPE == "rhel" || $OS_TYPE == "centos" || $OS_FAMILY == *"rhel"* ]]; then
     yum install -y gcc make ncurses-devel
 else
-    echo "不支持的Linux发行版，请手动安装以下依赖："
-    echo "1. gcc"
-    echo "2. make"
-    echo "3. ncurses开发库"
+    echo "未知的系统类型，请手动安装依赖：gcc、make和ncurses开发库"
     exit 1
 fi
 
 # 编译游戏
-make clean
-make
+echo "正在编译游戏..."
+mkdir -p build
+make release
 
-echo "游戏编译完成，运行 ./snake 开始游戏"
+# 检查编译结果
+if [ $? -eq 0 ]; then
+    echo "编译成功！"
+    echo "您可以通过执行 ./snake 来开始游戏"
+else
+    echo "编译失败，请检查错误信息"
+    exit 1
+fi
+
+exit 0

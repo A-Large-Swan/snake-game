@@ -1,6 +1,6 @@
-#include "game.h"
-#include "snake.h"
-#include "level.h"
+#include "../include/game.h"
+#include "../include/snake.h"
+#include "../include/level.h"
 #include <stdlib.h>
 #include <time.h>
 #include <locale.h>
@@ -16,15 +16,31 @@ int current_level = 0;
 int game_mode = MODE_CLASSIC;
 
 void generate_food(void) {
-    int valid = 0;
-    while (!valid) {
-        food.x = rand() % (WIDTH - 2) + 1;
-        food.y = rand() % (HEIGHT - 2) + 1;
-        
-        // 确保食物不在障碍物或蛇身上
-        if (!is_obstacle(food.x, food.y) && !is_snake_position(food.x, food.y)) {
-            valid = 1;
+    // 为避免与障碍物和蛇重叠，先构建一个可用位置列表
+    Point valid_positions[WIDTH * HEIGHT];
+    int num_valid_positions = 0;
+    
+    // 遍历地图，找出所有可用位置
+    for (int y = 1; y < HEIGHT - 1; y++) {
+        for (int x = 1; x < WIDTH - 1; x++) {
+            // 确保食物不会生成在蛇或障碍物上
+            if (!is_obstacle(x, y) && !is_snake_position(x, y)) {
+                valid_positions[num_valid_positions].x = x;
+                valid_positions[num_valid_positions].y = y;
+                num_valid_positions++;
+            }
         }
+    }
+    
+    // 如果有可用位置，随机选择一个
+    if (num_valid_positions > 0) {
+        int index = rand() % num_valid_positions;
+        food.x = valid_positions[index].x;
+        food.y = valid_positions[index].y;
+    } else {
+        // 如果没有可用位置，默认放在安全位置
+        food.x = 1;
+        food.y = 1;
     }
 }
 
@@ -104,6 +120,10 @@ void update(void) {
                 current_level++;
                 load_level(current_level);
                 score = 0;
+                // 重置蛇的长度和位置
+                init_snake();
+                // 生成新的食物
+                generate_food();
             } else {
                 game_over = 1;
             }
@@ -113,13 +133,26 @@ void update(void) {
     // 检查碰撞
     if (check_collision()) {
         game_over = 1;
+        clear();
+        wchar_t buf[100];
+        
         if (game_mode == MODE_CLASSIC) {
-            clear();
-            wchar_t buf[100];
             swprintf(buf, sizeof(buf)/sizeof(wchar_t), L"游戏结束！最终得分: %d", score);
             mvaddwstr(HEIGHT/2, WIDTH/2 - 15, buf);
             refresh();
             sleep(5);
+        } else if (game_mode == MODE_LEVELS) {
+            swprintf(buf, sizeof(buf)/sizeof(wchar_t), L"关卡 %d 失败！", current_level + 1);
+            mvaddwstr(HEIGHT/2 - 3, WIDTH/2 - 10, buf);
+            
+            swprintf(buf, sizeof(buf)/sizeof(wchar_t), L"最终得分: %d / %d", score, LEVEL_SCORE);
+            mvaddwstr(HEIGHT/2 - 1, WIDTH/2 - 10, buf);
+            
+            mvaddwstr(HEIGHT/2 + 1, WIDTH/2 - 10, L"按任意键退出游戏...");
+            refresh();
+            timeout(-1); // 等待用户按键
+            getch();
+            timeout(100); // 恢复原来的超时设置
         }
     }
 }

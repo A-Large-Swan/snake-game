@@ -1,7 +1,7 @@
-#include "snake.h"
-#include "game.h"
-#include "level.h"
-#include "ui.h"
+#include "../include/snake.h"
+#include "../include/game.h"
+#include "../include/level.h"
+#include "../include/ui.h"
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
@@ -30,9 +30,18 @@ void init_snake(void) {
     snake.length = SNAKE_LENGTH;
     snake.direction = 1; // 初始向右移动
     
-    // 设置蛇的初始位置在屏幕中间
-    int start_x = WIDTH / 4;
-    int start_y = HEIGHT / 2;
+    // 根据游戏模式设置蛇的初始位置
+    int start_x, start_y;
+    
+    if (game_mode == MODE_LEVELS) {
+        // 关卡模式：从左上角开始
+        start_x = 3;
+        start_y = 3;
+    } else {
+        // 经典模式：从屏幕中间开始
+        start_x = WIDTH / 4;
+        start_y = HEIGHT / 2;
+    }
     
     for (int i = 0; i < snake.length; i++) {
         snake.body[i].x = start_x - i;
@@ -91,8 +100,10 @@ int check_snake_collision(void) {
 
 // 检查某个位置是否是蛇的身体
 int is_snake_position(int x, int y) {
-    for (int i = 0; i < snake.length; i++) {
-        if (snake.body[i].x == x && snake.body[i].y == y) {
+    Snake* snake = get_snake();
+    
+    for (int i = 0; i < snake->length; i++) {
+        if (snake->body[i].x == x && snake->body[i].y == y) {
             return 1;
         }
     }
